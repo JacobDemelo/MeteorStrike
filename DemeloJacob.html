@@ -1,0 +1,464 @@
+<!--
+    Project Name: Project#1
+    Purpose: show meteorite strikes on a google map using JSON data collected from Nasa url
+    Author: Jacob Demelo
+    Date: 2022-06-17
+    Notes: Changed HTML Document to fit specific needs
+-->
+<html>
+<head>
+    <!--Title of project-->
+    <title>Meteorite Strikes</title>
+    <style>
+        /* Set the size of the div element that contains the map */
+        body{
+            background-color: white;
+        }
+        #map {
+        height: 600px;
+        /* The height is 400 pixels */
+        width: 80%;
+        margin-left: 10%;
+        }
+
+        input[type=text], select {
+        width: 100%;
+        padding: 12px 20px;
+        margin: 8px 0;
+        display: inline-block;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+        }
+
+        input[type=submit] {
+        width: 100%;
+        background-color: #0B3D91;
+        color: white;
+        padding: 14px 20px;
+        margin: 8px 0;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        }
+    </style>
+</head>
+
+<!-- Body -->
+<!--OnLoad-->
+<body onload="ShowMeteorites();">
+
+    <!--The div element for the map -->
+    <div id="map" style="text-align: center;"></div>
+
+    <!--Div For min max year-->
+    <div id="selectors"
+        style="border: 1px solid black; width: 400px; margin: 5px auto; padding:10px; text-align: center;">
+        <label for="minYear">Min Year: </label>
+        <input type="text" id="minYear" name="minYear"><br><br>
+        <label for="maxYear">Max Year: </label>
+        <input type="text" id="maxYear" name="maxYear"><br><br>
+        <input type="submit" value="Filter" onclick="Filter();"><br><br>
+        <input id="download" onclick="DownloadFilteredData('FilteredData.txt', '');" type="submit"
+            value="Save Filtered List">
+    </div>
+
+    <!--Div for the meteorite attributes-->
+    <div class="table"
+        style="border: 1px solid black; width: 400px; margin: 5px auto; padding:10px; text-align: center;">
+        <table style="width:100%">
+            <tr>
+                <th scope="col">Id</th>
+                <th scope="col">Name</th>
+                <th scope="col">Year</th>
+                <th scope="col">Class</th>
+            </tr>
+            <tbody id="tablebody" style="text-align:center;">
+
+            </tbody>
+        </table>
+    </div>
+
+    <!--SCRIPT-->
+    <!-- API KEY IN LINK BELOW -->
+    <script
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCK2Kqlc984IxyhbMdEE1nr7IpNvhp1v0Y&callback=initMap&v=weekly"
+        defer></script>
+    <script type="text/JavaScript">
+
+    /*
+    * Project: #1
+    * Script purpose: Process all of our JSON data
+    * Author: Jacob Demelo
+    * Date: 2022-06-17
+    */
+
+    /*
+    * Function Name: initMap()
+    * Purpose: Display the map to the screen
+    * Parameters: none
+    * Returns: displays map to screen
+    */
+    function initMap() {
+
+        //Set the location of the map to start
+        const uluru = { lat: -0., lng: 0 };
+
+        //Create the new map and display it in the map div
+        const map = new google.maps.Map(document.getElementById("map"), {
+        zoom: 2.8,
+        center: uluru,
+        });
+
+    }//end of function initMap()
+
+    //display the map
+    window.initMap = initMap;
+
+    //Global Varibles
+    const ISOK = 200;//ISOK request
+    var requestObject = new XMLHttpRequest();//httprequest
+    var url = "https://data.nasa.gov/resource/y77d-th95.json";//JSON URL
+    var meteoriteData = ""; //empty variable
+    var minYearSelected = 1;//set min year to 1
+    var maxYearSelected = 2022;//set the defualt year to 2022
+    var markers = [];//empty markers array
+    var checked = false;//data filtered
+    var filteredList = "";//filtered data to store in file
+
+    //call async function for JSON
+    getJSONAsync(url);
+
+    /*
+    * Function Name: getJSONAsync
+    * Purpose: get the JSON Async from Nasa url
+    * Parameters: url
+    * Returns: true or false request
+    */
+    function getJSONAsync(url) {
+
+        //request the JSON
+        requestObject.onload = callBack;
+        requestObject.open("GET", url, true);
+        requestObject.send();
+
+    }//end of function getJSONAsync
+
+    /*
+    * Function Name: callBack()
+    * Purpose: get the status and text from JSON
+    * Parameters: none
+    * Returns: ISOK and JSON Object
+    */
+    function callBack() {
+
+        //checking if the status is OK
+        if(requestObject.status === ISOK) {
+
+            //parsing the JSON to a javascript object
+            meteoriteData = JSON.parse(requestObject.responseText);
+
+        }//end of if
+
+    }//end of callBack function
+
+    /*
+    * Function Name: ShowMeteorites
+    * Purpose: get location and show meteorites
+    * Parameters: none
+    * Returns: meteorite pins
+    */
+    function ShowMeteorites(){
+
+         //clear the filtered list
+         filteredList = "";
+
+        //add the title of the filtered data to the filtered list that will be downloaded
+        filteredList = "ID Name Year Class" + "\n";
+        
+        //creating the meteoriteYear to have a length of 4
+        var length = 4;
+
+        //creating a variable to set the map in the center
+        var myLatlng = new google.maps.LatLng(0,0);
+
+        //attributes for the map
+        var mapOptions = {
+
+            zoom: 4,
+            center: myLatlng
+
+        }//end of map options
+
+        //creating the map to the div
+        var map = new google.maps.Map(document.getElementById("map"), mapOptions);
+        
+        //get the tablebody div
+        var tableDiv = document.getElementById("tablebody");
+
+        //clear the the table outputDiv
+        tableDiv.innerHTML = "";
+
+        //FOR LOOP
+        //get all of the meteorite data
+        for(var i = 0; i < meteoriteData.length; i++){
+
+            //create a variable that will save the meteor year
+            var meteorYear = 0;
+
+            //check if the year is undefined
+            if (typeof  meteoriteData[i].year !== 'undefined') {
+                    
+                //create a 4 character year from the meteoriteData array
+                meteorYear = meteoriteData[i].year.substring(0,length);
+
+            }//end of if
+
+            //Intentionally load all of the data to the map on start up
+            //checked === false means no filter
+            if(checked === false){
+
+                //create our map markers
+                var marker = new google.maps.Marker({
+                
+                //set the position on the markers to the map using the data from the meteorite array
+                position: new google.maps.LatLng(meteoriteData[i].reclat, meteoriteData[i].reclong),
+                map: map
+                });
+
+                //creating the info window for bonus marks
+                var infowindow = new google.maps.InfoWindow();
+
+                //adding a click event to every marker we have displayed
+                google.maps.event.addListener(marker, 'click', (function(marker, i) {
+                return function() {
+
+                //create all of the additional meteorite data in the infoWindow
+                infowindow.setContent("Meteor Name: " + meteoriteData[i].name + "<br/>"
+                                     +"Meteor Name Type: " + meteoriteData[i].nametype + "<br/>"
+                                     +"Meteor Class: " + meteoriteData[i].recclass + "<br/>"
+                                     +"Meteor Id: " + meteoriteData[i].id + "<br/>" 
+                                     +"Meteor Fall: " + meteoriteData[i].fall + "<br/>" 
+                                     +"Meteor Mass: " + meteoriteData[i].mass + "<br/>" 
+                                     +"Meteor Year: " + meteoriteData[i].year + "<br/>"
+                                     +"Meteor Location: Lat: " + meteoriteData[i].reclat + "Long:  " + meteoriteData[i].reclong);
+                infowindow.open(map, marker);
+                }
+                //adding the infoWindow to the marker
+                })(marker, i));
+
+                //push the markerto the markers array 
+                markers.push(marker);
+
+                //creating the table elements
+                //creating the tr element
+                var tableTr = document.createElement("tr");
+
+                //creating the meteoriteId
+                var meteoriteId = document.createElement("td");
+                meteoriteId.innerHTML = meteoriteData[i].id;
+            
+                //creating the meteoriteName
+                var meteoriteName = document.createElement("td");
+                meteoriteName.innerHTML = meteoriteData[i].name;
+            
+                //creating the meteoriteYear
+                var meteoriteYear = document.createElement("td");
+                meteoriteYear.innerHTML = meteorYear;
+                
+                //creating the meteoriteClass
+                var meteoriteClass =document.createElement("td");
+                meteoriteClass.innerHTML = meteoriteData[i].recclass;
+                
+                //append all of the elements to the tablebody
+                tableDiv.appendChild(tableTr);
+                tableTr.appendChild(meteoriteId);
+                tableTr.appendChild(meteoriteName);
+                tableTr.appendChild(meteoriteYear);
+                tableTr.appendChild(meteoriteClass);
+
+                //creating the filtered list from all of the meteorites that are displayed
+                filteredList += meteoriteData[i].id + " " + meteoriteData[i].name +" "+ meteorYear +" " + meteoriteData[i].recclass + "\n";
+
+            }//end of if
+
+            //FILTERED DATA
+            //If the min year is between the max year and we have checked all of the user input then only print filtered data
+            if(meteoriteData[i].year >= minYearSelected && meteoriteData[i].year <= maxYearSelected && checked === true){
+
+                //create the google map marker
+                var marker = new google.maps.Marker({
+                position: new google.maps.LatLng(meteoriteData[i].reclat, meteoriteData[i].reclong),
+                map: map
+                });
+
+                //create the infowindow for all of the filtered markers
+                var infowindow = new google.maps.InfoWindow();
+                google.maps.event.addListener(marker, 'click', (function(marker, i) {
+                return function() {
+
+                //set all of the content of each infoWindow
+                infowindow.setContent("Meteor Name: " + meteoriteData[i].name + "<br/>"
+                                     +"Meteor Name Type: " + meteoriteData[i].nametype + "<br/>"
+                                     +"Meteor Class: " + meteoriteData[i].recclass + "<br/>"
+                                     +"Meteor Id: " + meteoriteData[i].id + "<br/>" 
+                                     +"Meteor Fall: " + meteoriteData[i].fall + "<br/>" 
+                                     +"Meteor Mass: " + meteoriteData[i].mass + "<br/>" 
+                                     +"Meteor Year: " + meteoriteData[i].year + "<br/>"
+                                     +"Meteor Location: Lat: " + meteoriteData[i].reclat + "Long:  " + meteoriteData[i].reclong);
+                infowindow.open(map, marker);
+                }
+                //add the infowindow to the marker
+                })(marker, i));
+
+                //push the marker
+                markers.push(marker);
+
+                //creating the tr element
+                var tableTr = document.createElement("tr");
+
+                //creating the meteoriteId
+                var meteoriteId = document.createElement("td");
+                meteoriteId.innerHTML = meteoriteData[i].id;
+            
+                //creating the meteoriteName
+                var meteoriteName = document.createElement("td");
+                meteoriteName.innerHTML = meteoriteData[i].name;
+            
+                //creating the meteoriteYear
+                var meteoriteYear = document.createElement("td");
+                meteoriteYear.innerHTML = meteorYear;
+                
+                //creating the meteoriteClass
+                var meteoriteClass =document.createElement("td");
+                meteoriteClass.innerHTML = meteoriteData[i].recclass;
+                
+                //append to productRemove
+                tableDiv.appendChild(tableTr);
+                tableTr.appendChild(meteoriteId);
+                tableTr.appendChild(meteoriteName);
+                tableTr.appendChild(meteoriteYear);
+                tableTr.appendChild(meteoriteClass);
+
+                //creating the filtered list from all of the meteorites that are displayed
+                filteredList += meteoriteData[i].id + " " + meteoriteData[i].name +" "+ meteorYear +" " + meteoriteData[i].recclass + "\n";
+
+            }//end of if
+
+        }//end of for loop
+
+    }//end of showMeteorites() function
+
+    /*
+    * Funtion Name: Filter()
+    * Purpose: to filter the user input
+    * Parameters: none
+    * Returns: filtered data
+    */
+    function Filter(){
+
+        //get the tablebody
+        var tableDiv = document.getElementById("tablebody");
+
+        //get the min and max year values
+        var minYear = document.getElementById("minYear").value;
+        var maxYear = document.getElementById("maxYear").value;
+
+        //IF Statements
+        //if the min or max year is empty output alert
+        if(minYear === "" || maxYear === ""){
+
+            //values cannot be empty
+            alert("Values Cannot be empty!");
+
+        //else if min year is bigger than max year
+        }else if(minYear > maxYear){
+
+            //alert that min year cannot be bigger than the max year
+            alert("Min Year Cannot be greater than maxYear!");
+
+        //else if max year or min year is bigger than 2022
+        }else if(maxYear > 2022 || minYear > 2022){
+
+            //alert max and min year cannot be greater than our current year
+            alert("Max year or Min Year cannot be greater than our current year!");
+
+        //else if min year is less than zero
+        }else if(minYear < 0){
+
+            //alert min year cannot be below zero
+            alert("Min year cannot be below zero!");
+
+        //else all is good
+        }else{
+
+            //set checked variable to true
+            checked = true;
+
+        }//end of if
+
+        //if checked is true
+        if(checked === true){
+
+            //remove markers from the screen
+            for (var i = 0; i < markers.length; i++) {
+
+                //set the markers to null
+                markers[i].setMap(null);
+
+                //clear the table div element
+                tableDiv.innerHTML = "";
+
+            }//end of for
+
+            //set the selected min and max year to the user input
+            minYearSelected = minYear;
+            maxYearSelected = maxYear + 1;//adding one to get the correct year
+
+            //set markers array to empty
+            markers = [];
+
+            //call ShowMeteorites
+            ShowMeteorites();
+
+        }//end of if
+
+    }//end of Filter()
+
+    /*
+    * Function Name: DownloadFilteredData
+    * Purpose: Download a txt file of the filtered data
+    * Paramteres: file name the data you want to print and the type of file
+    * Returns: a downloaded textfile of the filtered meteors
+    */
+    function DownloadFilteredData(filename, text, type="text/plain") {
+
+        //Create an element that will be invisible to the user
+        const element = document.createElement("a");
+
+        //set the style to none
+        element.style.display = "none";
+
+        //add the element to the screen
+        document.body.appendChild(element);
+
+        //make the text equal the filtered list
+        text = filteredList;
+
+        //Set the HREF to a Blob representation of the data to be downloaded
+        element.href = window.URL.createObjectURL(
+            new Blob([text], { type })
+        );
+
+        //Using the download attribute to set the file name
+        element.setAttribute("download", filename);
+
+        //Adding a trigger event
+        element.click();
+
+    }//end of DownloadFilteredData()
+
+</script>
+</body>
+
+</html>
